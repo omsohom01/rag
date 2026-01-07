@@ -12,4 +12,10 @@
       "dest": "/api/$1"
     }
   ],
+  "env": {
+    "GEMINI_API_KEY": "AIzaSyDWpQUx8uA4qZgtuQPk6E_XDC6QGZ9gKeM",
+    "PINECONE_API_KEY": "pcsk_3daVJD_Ko7bArkub6eZVm2DMH87UivgBcAbbz7tX2KX7druWGSvDYogXCs8LmrqmpJnY9r",
+    "PINECONE_ENV": "us-east1-gcp",
+    "PINECONE_INDEX": "agri-rag"
+  }
 }
