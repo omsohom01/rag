@@ -1,52 +1,54 @@
 import 'dotenv/config';
-import { embedText } from '../src/lib/gemini';
+import { embedText, generateAnswer } from '../src/lib/gemini';
 import { queryVectors } from '../src/lib/pinecone';
 import { logger } from '../src/utils/logger';
 
 async function testRAG() {
   try {
-    console.log('='.repeat(50));
+    console.log('='.repeat(60));
     console.log('RAG SYSTEM TEST');
-    console.log('='.repeat(50));
+    console.log('='.repeat(60));
     console.log('');
 
-    const testQuery = 'What is the main topic of this document?';
-    console.log(`Test Query: "${testQuery}"`);
-    console.log('');
+    const testQueries = [
+      'What is crop rotation?',
+      'Why is crop rotation important in farming?',
+      'What are the different methods of irrigation?',
+      'What is organic farming?',
+      'What is cassava mosaic disease?'
+    ];
 
-    console.log('Embedding query...');
-    const queryEmbedding = await embedText(testQuery);
-    console.log(`✓ Embedding generated (dimension: ${queryEmbedding.length})`);
-    console.log('');
+    for (const testQuery of testQueries) {
+      const queryEmbedding = await embedText(testQuery);
+      const matches = await queryVectors(queryEmbedding, 1);
 
-    console.log('Querying Pinecone...');
-    const matches = await queryVectors(queryEmbedding, 5);
-    console.log(`✓ Retrieved ${matches.length} chunks`);
-    console.log('');
-
-    if (matches.length === 0) {
-      console.log('⚠ No matches found in vector database');
-      return;
-    }
-
-    console.log('Results:');
-    console.log('-'.repeat(50));
-    matches.forEach((match, idx) => {
-      console.log(`\n[${idx + 1}] Match:`);
-      console.log(`  Source: ${match.metadata.source}`);
-      console.log(`  Similarity Score: ${match.score.toFixed(4)}`);
-      console.log(`  Chunk Index: ${match.metadata.chunkIndex}`);
-      console.log(`  Text Preview: ${match.metadata.text.substring(0, 100)}...`);
+      console.log(`Query: ${testQuery}`);
       
-      if (match.score < 0.6) {
-        console.log(`  ⚠ LOW SCORE - Below 0.6 threshold`);
+      if (matches.length === 0 || matches[0].score < 0.6) {
+        // Generate answer from Gemini if no match or low similarity
+        let generatedAnswer = await generateAnswer(testQuery);
+        
+        // Remove markdown formatting (stars, bold, headers, etc.)
+        generatedAnswer = generatedAnswer
+          .replace(/\*\*/g, '') // Remove bold **
+          .replace(/\*/g, '') // Remove italic *
+          .replace(/^#+\s+/gm, '') // Remove headers
+          .replace(/^-\s+/gm, '') // Remove bullet points with dash
+          .replace(/^\*\s+/gm, ''); // Remove bullet points with asterisk
+        
+        console.log(`Answer: ${generatedAnswer}`);
+        console.log(`Source: Gemini AI (Generated)`);
+        console.log(`Similarity: ${matches.length > 0 ? matches[0].score.toFixed(4) : 'N/A'}`);
+      } else {
+        // Use RAG answer
+        const topMatch = matches[0];
+        console.log(`Answer: ${topMatch.metadata.text}`);
+        console.log(`Source: ${topMatch.metadata.source}`);
+        console.log(`Similarity: ${topMatch.score.toFixed(4)}`);
       }
-    });
-
-    console.log('');
-    console.log('='.repeat(50));
-    console.log('TEST COMPLETED');
-    console.log('='.repeat(50));
+      
+      console.log('-'.repeat(60));
+    }
 
   } catch (error) {
     logger.error('Test failed', error);

@@ -4,6 +4,7 @@ export interface TextChunk {
   text: string;
   index: number;
   source: string;
+  metadata?: Record<string, any>;
 }
 
 const CHUNK_SIZE = 800;
@@ -13,7 +14,7 @@ function estimateTokenCount(text: string): number {
   return Math.ceil(text.split(/\s+/).length);
 }
 
-export function chunkText(text: string, source: string): TextChunk[] {
+export function chunkText(text: string, source: string, metadata?: Record<string, any>): TextChunk[] {
   const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
   const chunks: TextChunk[] = [];
   let currentChunk = '';
@@ -31,6 +32,7 @@ export function chunkText(text: string, source: string): TextChunk[] {
         text: currentChunk.trim(),
         index: chunkIndex,
         source,
+        metadata,
       });
 
       const words = currentChunk.split(/\s+/);
@@ -47,6 +49,7 @@ export function chunkText(text: string, source: string): TextChunk[] {
       text: currentChunk.trim(),
       index: chunkIndex,
       source,
+      metadata,
     });
   }
 
@@ -60,11 +63,11 @@ export function chunkText(text: string, source: string): TextChunk[] {
   return chunks;
 }
 
-export function chunkDocuments(documents: { text: string; source: string }[]): TextChunk[] {
+export function chunkDocuments(documents: { text: string; source: string; metadata?: Record<string, any> }[]): TextChunk[] {
   const allChunks: TextChunk[] = [];
 
   for (const doc of documents) {
-    const chunks = chunkText(doc.text, doc.source);
+    const chunks = chunkText(doc.text, doc.source, doc.metadata);
     allChunks.push(...chunks);
   }
 

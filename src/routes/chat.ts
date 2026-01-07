@@ -47,10 +47,18 @@ router.post('/', async (req: Request, res: Response) => {
       logger.info('No relevant chunks found - using Gemini LLM fallback');
       
       const fallbackPrompt = `Answer the following question concisely and accurately:\n\nQUESTION: ${query}\n\nANSWER:`;
-      const answer = await withRetry(
+      let answer = await withRetry(
         () => generateAnswer(fallbackPrompt),
         { maxAttempts: 3, delayMs: 1000 }
       );
+      
+      // Remove markdown formatting
+      answer = answer
+        .replace(/\*\*/g, '')
+        .replace(/\*/g, '')
+        .replace(/^#+\s+/gm, '')
+        .replace(/^-\s+/gm, '')
+        .replace(/^\*\s+/gm, '');
 
       return res.status(200).json({
         answer,
@@ -85,6 +93,14 @@ router.post('/', async (req: Request, res: Response) => {
         () => generateAnswer(fallbackPrompt),
         { maxAttempts: 3, delayMs: 1000 }
       );
+      
+      // Remove markdown formatting
+      answer = answer
+        .replace(/\*\*/g, '')
+        .replace(/\*/g, '')
+        .replace(/^#+\s+/gm, '')
+        .replace(/^-\s+/gm, '')
+        .replace(/^\*\s+/gm, '');
 
       return res.status(200).json({
         answer,

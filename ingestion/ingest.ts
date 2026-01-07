@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { loadPDFsFromDirectory } from './pdfLoader';
+import { loadJSONsFromDirectory } from './jsonLoader';
 import { chunkDocuments } from './chunker';
 import { embedAndUpsertChunks } from './embedAndUpsert';
 import { logger } from '../src/utils/logger';
@@ -9,30 +10,54 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 async function main() {
   try {
-    logger.info('Starting PDF ingestion process');
+    logger.info('Starting document ingestion process');
 
     const pdfsDir = path.join(__dirname, '..', 'pdfs');
-    logger.info(`Loading PDFs from: ${pdfsDir}`);
+    logger.info(`Loading documents from: ${pdfsDir}`);
 
-    const documents = await loadPDFsFromDirectory(pdfsDir);
+    // Load PDFs
+    logger.info('--- Loading PDF files ---');
+    const pdfDocuments = await loadPDFsFromDirectory(pdfsDir);
+    logger.info(`Loaded ${pdfDocuments.length} PDF documents`);
 
-    if (documents.length === 0) {
+    // Load JSONs
+    logger.info('--- Loading JSON files ---');
+    const jsonDocuments = await loadJSONsFromDirectory(pdfsDir);
+    logger.info(`Loaded ${jsonDocuments.length} JSON entries`);
+
+    const totalDocuments = pdfDocuments.length + jsonDocuments.length;
+
+    if (totalDocuments === 0) {
       logger.warn('No documents to process');
       return;
     }
 
-    logger.info(`Loaded ${documents.length} documents`);
+    logger.info(`Total documents to process: ${totalDocuments} (${pdfDocuments.length} PDFs, ${jsonDocuments.length} JSON entries)`);
 
-    const docsForChunking = documents.map((doc) => ({
+    // Convert PDFs to uniform format
+    const pdfDocsForChunking = pdfDocuments.map((doc) => ({
       text: doc.text,
       source: doc.filename,
     }));
 
-    const chunks = chunkDocuments(docsForChunking);
+    // Convert JSONs to uniform format with metadata
+    const jsonDocsForChunking = jsonDocuments.map((doc) => ({
+      text: doc.text,
+      source: doc.filename,
+      metadata: doc.metadata,
+    }));
 
+    // Combine all documents
+    const allDocs = [...pdfDocsForChunking, ...jsonDocsForChunking];
+
+    logger.info('--- Chunking documents ---');
+    const chunks = chunkDocuments(allDocs);
+
+    logger.info('--- Embedding and upserting chunks ---');
     await embedAndUpsertChunks(chunks);
 
-    logger.info('Ingestion completed successfully');
+    logger.info('✓ Ingestion completed successfully');
+    logger.info(`Summary: Processed ${totalDocuments} documents into ${chunks.length} chunks`);
   } catch (error) {
     logger.error('Ingestion failed', error);
     process.exit(1);
