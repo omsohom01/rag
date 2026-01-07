@@ -1,8 +1,29 @@
 {
-  "name": "agri-rag-backend",
-  "private": true,
-  "type": "module",
+  "name": "rag-backend",
+  "version": "1.0.0",
+  "description": "RAG chatbot backend with Gemini and Pinecone",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "tsc",
+    "ingest": "tsx ingestion/ingest.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": ["rag", "chatbot", "gemini", "pinecone"],
+  "author": "",
+  "license": "MIT",
   "dependencies": {
-    "@vercel/node": "^5.5.16"
+    "@google/generative-ai": "^0.21.0",
+    "@pinecone-database/pinecone": "^3.0.3",
+    "@vercel/node": "^3.0.0",
+    "pdf-parse": "^1.1.1",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/pdf-parse": "^1.1.4",
+    "typescript": "^5.4.5",
+    "tsx": "^4.19.2",
+    "vercel": "^37.0.0"
   }
 }
