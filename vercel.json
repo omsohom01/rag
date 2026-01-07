@@ -12,10 +12,4 @@
       "dest": "/api/$1"
     }
   ],
-  "env": {
-    "GEMINI_API_KEY": "@gemini-api-key",
-    "PINECONE_API_KEY": "@pinecone-api-key",
-    "PINECONE_ENV": "@pinecone-env",
-    "PINECONE_INDEX": "@pinecone-index"
-  }
 }
