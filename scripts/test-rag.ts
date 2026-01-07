@@ -1,7 +1,7 @@
 import 'dotenv/config';
-import { embedText } from '../lib/gemini';
-import { queryVectors } from '../lib/pinecone';
-import { logger } from '../utils/logger';
+import { embedText } from '../src/lib/gemini';
+import { queryVectors } from '../src/lib/pinecone';
+import { logger } from '../src/utils/logger';
 
 async function testRAG() {
   try {

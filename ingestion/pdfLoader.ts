@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import pdf from 'pdf-parse';
-import { logger } from '../utils/logger';
+import { logger } from '../src/utils/logger';
 
 export interface PDFDocument {
   filename: string;

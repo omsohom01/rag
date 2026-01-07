@@ -3,7 +3,7 @@ import * as dotenv from 'dotenv';
 import { loadPDFsFromDirectory } from './pdfLoader';
 import { chunkDocuments } from './chunker';
 import { embedAndUpsertChunks } from './embedAndUpsert';
-import { logger } from '../utils/logger';
+import { logger } from '../src/utils/logger';
 
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 

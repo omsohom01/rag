@@ -1,8 +1,8 @@
 import 'dotenv/config';
-import { embedText, generateAnswer } from '../lib/gemini';
-import { queryVectors } from '../lib/pinecone';
-import { buildRAGPrompt } from '../lib/ragPrompt';
-import { logger } from '../utils/logger';
+import { embedText, generateAnswer } from '../src/lib/gemini';
+import { queryVectors } from '../src/lib/pinecone';
+import { buildRAGPrompt } from '../src/lib/ragPrompt';
+import { logger } from '../src/utils/logger';
 
 interface ChatResponse {
   answer: string;

@@ -1,7 +1,7 @@
-import { embedText } from '../lib/gemini';
-import { upsertVectors, VectorMetadata } from '../lib/pinecone';
-import { logger } from '../utils/logger';
-import { withRetry } from '../utils/retry';
+import { embedText } from '../src/lib/gemini';
+import { upsertVectors, VectorMetadata } from '../src/lib/pinecone';
+import { logger } from '../src/utils/logger';
+import { withRetry } from '../src/utils/retry';
 import { TextChunk } from './chunker';
 
 function generateChunkId(source: string, index: number): string {
