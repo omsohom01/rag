@@ -18,7 +18,7 @@ async function simulateChatRequest(query: string): Promise<ChatResponse> {
   console.log('-'.repeat(60));
 
   const queryEmbedding = await embedText(query);
-  const matches = await queryVectors(queryEmbedding, 5);
+  const matches = await queryVectors(queryEmbedding, 10); // Increased to see more results
 
   if (matches.length === 0) {
     console.log('⚠ No relevant chunks found - using Gemini LLM fallback');
@@ -35,11 +35,15 @@ async function simulateChatRequest(query: string): Promise<ChatResponse> {
   }
 
   console.log(`✓ Found ${matches.length} relevant chunks`);
-  if (process.env.RAG_DEBUG === 'true') {
-    console.log('Chunk scores:', matches.map(m => m.score.toFixed(4)).join(', '));
-  }
+  
+  // Debug: Show all sources
+  console.log('Top sources:');
+  matches.slice(0, 10).forEach((m, i) => {
+    console.log(`  ${i + 1}. ${m.metadata.source} (score: ${m.score.toFixed(4)})`);
+  });
 
   const context = matches
+    .slice(0, 5)
     .map((match, idx) => `[${idx + 1}] (Source: ${match.metadata.source})\n${match.metadata.text}`)
     .join('\n\n');
 
@@ -76,25 +80,10 @@ async function testChat() {
     console.log('='.repeat(60));
 
     const queries = [
-  // Core agriculture concepts
-  'What is soil fertility and how can it be improved?',
-  'What is organic farming?',
-  'Explain sustainable agriculture practices.',
-  'What is crop rotation and why is it important?',
-  'What are the advantages of organic farming?',
-  'What is soil fertility and how can it be improved?',
-
-  // Crop & soil management
-  'How does crop rotation improve soil health?',
-  'What are common methods of soil conservation?',
-  'What is green manure in agriculture?',
-  'Explain the importance of irrigation in farming.',
-  'What is mixed cropping?',
-
-  // Environmental & climate
-  'How does agriculture impact the environment?',
-  'What is sustainable water management in agriculture?',
-  'How can farmers reduce soil erosion?',
+  'what is crop rotation',
+  'what are the different methods of irrigation?',
+  'Which crop is the major source of food in africa?',
+  'what is the major cassava disease?',
 ];
 
 

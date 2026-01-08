@@ -1,10 +1,19 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { embedText } from '../lib/gemini';
-import { generateAnswer } from '../lib/gemini';
-import { queryVectors } from '../lib/pinecone';
-import { buildRAGPrompt } from '../lib/ragPrompt';
-import { logger } from '../utils/logger';
-import { withRetry } from '../utils/retry';
+import { embedText } from '../src/lib/gemini';
+import { generateAnswer } from '../src/lib/gemini';
+import { queryVectors } from '../src/lib/pinecone';
+import { buildRAGPrompt } from '../src/lib/ragPrompt';
+import { logger } from '../src/utils/logger';
+import { withRetry } from '../src/utils/retry';
+
+interface VercelRequest {
+  method: string;
+  body: any;
+}
+
+interface VercelResponse {
+  status: (code: number) => VercelResponse;
+  json: (data: any) => void;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -26,15 +35,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     );
 
     const matches = await withRetry(
-      () => queryVectors(queryEmbedding, 5),
+      () => queryVectors(queryEmbedding, 3),
       { maxAttempts: 3, delayMs: 1000 }
     );
 
     if (process.env.RAG_DEBUG === 'true') {
       logger.info('RAG Debug - Retrieved chunks', {
         count: matches.length,
-        scores: matches.map(m => m.score),
-        sources: matches.map(m => m.metadata.source),
+        scores: matches.map((m: any) => m.score),
+        sources: matches.map((m: any) => m.metadata.source),
       });
     }
 
@@ -56,7 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const context = matches
-      .map((match, idx) => `[${idx + 1}] (Source: ${match.metadata.source})\n${match.metadata.text}`)
+      .map((match: any, idx: number) => `[${idx + 1}] (Source: ${match.metadata.source})\n${match.metadata.text}`)
       .join('\n\n');
 
     const prompt = buildRAGPrompt(query, context);
@@ -66,10 +75,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       { maxAttempts: 3, delayMs: 1000 }
     );
 
-    if (answer.includes('Information not found in provided documents')) {
-      logger.info('RAG returned "not found" - using Gemini LLM fallback');
+    // Check if RAG answer is unhelpful or indicates no information
+    const unhelpfulPatterns = [
+      'Information not found in provided documents',
+      'I don\'t have information',
+      'I don\'t have any information',
+      'not available in the documents',
+      'cannot answer',
+      'no information available',
+      'unable to answer',
+      'not mentioned in the context',
+      'not provided in the documents',
+      'I cannot find',
+    ];
+
+    const isUnhelpfulAnswer = unhelpfulPatterns.some(pattern => 
+      answer.toLowerCase().includes(pattern.toLowerCase())
+    );
+
+    if (isUnhelpfulAnswer) {
+      logger.info('RAG returned unhelpful answer - using Gemini LLM fallback');
       
-      const fallbackPrompt = `Answer the following question concisely and accurately:\n\nQUESTION: ${query}\n\nANSWER:`;
+      const fallbackPrompt = `Answer the following question concisely and accurately in 60-100 words:\n\nQUESTION: ${query}\n\nANSWER:`;
       answer = await withRetry(
         () => generateAnswer(fallbackPrompt),
         { maxAttempts: 3, delayMs: 1000 }
@@ -83,7 +110,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const sources = matches.map((match) => ({
+    const sources = matches.map((match: any) => ({
       source: `Found in documents: ${match.metadata.source}`,
       score: match.score,
       chunkIndex: match.metadata.chunkIndex,

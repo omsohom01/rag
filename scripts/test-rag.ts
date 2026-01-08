@@ -11,13 +11,11 @@ async function testRAG() {
     console.log('');
 
     const testQueries = [
-      'how to farm rice',
-      'How does irrigation affect crop yield?',
-      'What is crop rotation?',
-      'Why is crop rotation important in farming?',
-      'What are the different methods of irrigation?',
-      'What is organic farming?',
-      'What is cassava mosaic disease?'
+      'What farming practice helps prevent soil erosion?',
+      'what is crop rotation',
+      'what are the different methods of irrigation?',
+      'Which crop is the major source of food in africa?',
+      'what is the major cassava disease?'
     ];
 
     for (const testQuery of testQueries) {

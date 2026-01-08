@@ -16,12 +16,21 @@ interface JSONEntry {
   [key: string]: any;
 }
 
+// Target chunk size in tokens (same as PDF chunks)
+const TARGET_CHUNK_SIZE = 400;
+const AVG_CHARS_PER_TOKEN = 4; // Approximate: 1 token ≈ 4 characters
+const TARGET_CHUNK_CHARS = TARGET_CHUNK_SIZE * AVG_CHARS_PER_TOKEN; // ~1600 characters
+
 /**
  * Extracts text from a JSON entry
- * Looks for common text fields: text, content, answer
- * For Q&A format, returns only the answer (question stored in metadata)
+ * For Q&A format, combines question and answer
  */
 function extractTextFromEntry(entry: JSONEntry): string {
+  // For Q&A format, combine question and answer to preserve context
+  if (entry.question && entry.answer) {
+    return `Q: ${entry.question}\nA: ${entry.answer}`;
+  }
+  
   if (entry.text) return entry.text;
   if (entry.content) return entry.content;
   if (entry.answer) return entry.answer;
@@ -32,26 +41,63 @@ function extractTextFromEntry(entry: JSONEntry): string {
 }
 
 /**
- * Extracts metadata from a JSON entry, excluding text fields
+ * Combines multiple JSON entries into chunks of similar size to PDF chunks
  */
-function extractMetadata(entry: JSONEntry): Record<string, any> {
-  const metadata: Record<string, any> = {};
-  const textFields = new Set(['text', 'content', 'answer', 'question']);
-  
-  for (const [key, value] of Object.entries(entry)) {
-    if (!textFields.has(key) && value !== null && value !== undefined) {
-      // Only include primitive values and simple objects
-      if (typeof value !== 'object' || Array.isArray(value)) {
-        metadata[key] = value;
-      }
+function combineEntriesIntoChunks(entries: JSONEntry[], filename: string): JSONDocument[] {
+  const chunks: JSONDocument[] = [];
+  let currentChunk: string[] = [];
+  let currentLength = 0;
+  let entryIds: number[] = [];
+
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    const text = extractTextFromEntry(entry);
+    const textLength = text.length;
+
+    // If adding this entry would exceed target size and we have content, save current chunk
+    if (currentLength + textLength > TARGET_CHUNK_CHARS && currentChunk.length > 0) {
+      chunks.push({
+        text: currentChunk.join('\n\n'),
+        filename,
+        metadata: {
+          entryCount: currentChunk.length,
+          entryIds: entryIds.map(id => String(id)),
+          chunkIndex: chunks.length,
+        },
+      });
+      
+      // Start new chunk
+      currentChunk = [];
+      currentLength = 0;
+      entryIds = [];
+    }
+
+    // Add entry to current chunk
+    currentChunk.push(text);
+    currentLength += textLength + 2; // +2 for the "\n\n" separator
+    if (entry.id !== undefined) {
+      entryIds.push(entry.id);
     }
   }
-  
-  return metadata;
+
+  // Add the last chunk if it has content
+  if (currentChunk.length > 0) {
+    chunks.push({
+      text: currentChunk.join('\n\n'),
+      filename,
+      metadata: {
+        entryCount: currentChunk.length,
+        entryIds: entryIds.map(id => String(id)),
+        chunkIndex: chunks.length,
+      },
+    });
+  }
+
+  return chunks;
 }
 
 /**
- * Loads a single JSON file and converts entries to documents
+ * Loads a single JSON file and converts entries to balanced chunks
  */
 async function loadJSONFile(filePath: string): Promise<JSONDocument[]> {
   try {
@@ -64,23 +110,13 @@ async function loadJSONFile(filePath: string): Promise<JSONDocument[]> {
       return [];
     }
 
-    const documents: JSONDocument[] = [];
+    // Combine multiple entries into chunks of similar size to PDF chunks
+    const chunks = combineEntriesIntoChunks(data, filename);
 
-    for (const entry of data) {
-      if (typeof entry === 'object' && entry !== null) {
-        const text = extractTextFromEntry(entry);
-        const metadata = extractMetadata(entry);
-
-        documents.push({
-          text,
-          filename,
-          metadata,
-        });
-      }
-    }
-
-    logger.info(`Loaded ${documents.length} entries from JSON file: ${filename}`);
-    return documents;
+    logger.info(`Loaded ${data.length} entries from JSON file: ${filename}`);
+    logger.info(`Combined into ${chunks.length} balanced chunks (~${TARGET_CHUNK_SIZE} tokens each)`);
+    
+    return chunks;
   } catch (error) {
     logger.error(`Failed to load JSON file: ${filePath}`, error);
     throw error;
@@ -106,11 +142,11 @@ export async function loadJSONsFromDirectory(dirPath: string): Promise<JSONDocum
 
     for (const file of jsonFiles) {
       const filePath = path.join(dirPath, file);
-      const docs = await loadJSONFile(filePath);
-      allDocuments.push(...docs);
+      const chunks = await loadJSONFile(filePath);
+      allDocuments.push(...chunks);
     }
 
-    logger.info(`Total JSON entries loaded: ${allDocuments.length}`);
+    logger.info(`Total JSON chunks created: ${allDocuments.length}`);
     return allDocuments;
   } catch (error) {
     logger.error('Failed to load JSON files from directory', error);

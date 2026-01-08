@@ -11,6 +11,7 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 async function main() {
   try {
     logger.info('Starting document ingestion process');
+    logger.info('🔍 DIAGNOSTIC MODE ENABLED - Full logging active');
 
     const pdfsDir = path.join(__dirname, '..', 'pdfs');
     logger.info(`Loading documents from: ${pdfsDir}`);
@@ -52,11 +53,38 @@ async function main() {
 
     logger.info('--- Chunking documents ---');
     const chunks = chunkDocuments(allDocs);
+    
+    // DIAGNOSTIC: Analyze chunks
+    logger.info(`\n📊 Chunk Analysis:`);
+    const chunksBySource: Record<string, number> = {};
+    chunks.forEach(chunk => {
+      chunksBySource[chunk.source] = (chunksBySource[chunk.source] || 0) + 1;
+    });
+    Object.entries(chunksBySource).forEach(([source, count]) => {
+      logger.info(`   ${source}: ${count} chunks`);
+    });
+    
+    // Check for index resets
+    const indexesBySource: Record<string, number[]> = {};
+    chunks.forEach(chunk => {
+      if (!indexesBySource[chunk.source]) {
+        indexesBySource[chunk.source] = [];
+      }
+      indexesBySource[chunk.source].push(chunk.index);
+    });
+    
+    logger.info(`\n🔍 Index Range Check (detecting potential ID collisions):`);
+    Object.entries(indexesBySource).forEach(([source, indices]) => {
+      const min = Math.min(...indices);
+      const max = Math.max(...indices);
+      const hasReset = min === 0 || indices.includes(0);
+      logger.info(`   ${source}: indices ${min} to ${max} ${hasReset ? '⚠️ (starts at 0 - potential collision!)' : '✓'}`);
+    });
 
-    logger.info('--- Embedding and upserting chunks ---');
+    logger.info('\n--- Embedding and upserting chunks ---');
     await embedAndUpsertChunks(chunks);
 
-    logger.info('✓ Ingestion completed successfully');
+    logger.info('\n✓ Ingestion completed successfully');
     logger.info(`Summary: Processed ${totalDocuments} documents into ${chunks.length} chunks`);
   } catch (error) {
     logger.error('Ingestion failed', error);
