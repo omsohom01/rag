@@ -44,14 +44,11 @@ async function simulateChatRequest(query: string): Promise<ChatResponse> {
   if (matches.length === 0) {
     console.log('⚠ No relevant chunks found - using Gemini LLM fallback');
     
-    const fallbackPrompt = `Answer the following question concisely and accurately:\n\nQUESTION: ${englishQuery}\n\nANSWER:`;
-    let answer = await generateAnswer(fallbackPrompt);
-    
-    // Step 4: Translate answer back if needed
-    if (detectedLanguage !== 'en') {
-      console.log('🔄 Translating answer back to original language...');
-      answer = await translateFromEnglish(answer, detectedLanguage);
-    }
+    // Generate answer directly in target language
+    const fallbackPrompt = detectedLanguage !== 'en'
+      ? `Answer the following question concisely and accurately in ${detectedLanguage} language (the same language as the original question "${query}"):\n\nQUESTION: ${englishQuery}\n\nANSWER in ${detectedLanguage}:`
+      : `Answer the following question concisely and accurately:\n\nQUESTION: ${englishQuery}\n\nANSWER:`;
+    const answer = await generateAnswer(fallbackPrompt);
     
     return {
       answer,
@@ -77,14 +74,11 @@ async function simulateChatRequest(query: string): Promise<ChatResponse> {
   if (topScore < 0.6) {
     console.log(`⚠ Top score too low (${topScore.toFixed(4)} < 0.6) - using Gemini LLM fallback`);
     
-    const fallbackPrompt = `Answer the following question concisely and accurately:\n\nQUESTION: ${englishQuery}\n\nANSWER:`;
-    let answer = await generateAnswer(fallbackPrompt);
-    
-    // Translate answer back if needed
-    if (detectedLanguage !== 'en') {
-      console.log('🔄 Translating answer back to original language...');
-      answer = await translateFromEnglish(answer, detectedLanguage);
-    }
+    // Generate answer directly in target language
+    const fallbackPrompt = detectedLanguage !== 'en'
+      ? `Answer the following question concisely and accurately in ${detectedLanguage} language (the same language as the original question "${query}"):\n\nQUESTION: ${englishQuery}\n\nANSWER in ${detectedLanguage}:`
+      : `Answer the following question concisely and accurately:\n\nQUESTION: ${englishQuery}\n\nANSWER:`;
+    const answer = await generateAnswer(fallbackPrompt);
     
     return {
       answer,
@@ -102,20 +96,32 @@ async function simulateChatRequest(query: string): Promise<ChatResponse> {
     .map((match) => match.metadata.text)
     .join('\n\n');
 
-  const prompt = buildRAGPrompt(englishQuery, context);
+  // Generate answer directly in target language using buildRAGPrompt with language parameters
+  const languageNames: Record<string, string> = {
+    'en': 'English',
+    'hi': 'Hindi',
+    'bn': 'Bengali',
+    'es': 'Spanish',
+    'fr': 'French',
+    'de': 'German',
+    'zh': 'Chinese',
+    'ar': 'Arabic',
+    'pt': 'Portuguese',
+    'ru': 'Russian',
+  };
+  
+  const targetLanguageName = languageNames[detectedLanguage] || detectedLanguage;
+  const prompt = buildRAGPrompt(englishQuery, context, targetLanguageName, detectedLanguage);
   let answer = await generateAnswer(prompt);
 
   if (answer.includes("I don't have specific information about that")) {
     console.log('⚠ RAG returned "not found" - using Gemini LLM fallback');
     
-    const fallbackPrompt = `Answer the following question concisely and accurately:\n\nQUESTION: ${englishQuery}\n\nANSWER:`;
+    // Generate answer directly in target language
+    const fallbackPrompt = detectedLanguage !== 'en'
+      ? `Answer the following question concisely and accurately in ${detectedLanguage} language (the same language as the original question "${query}"):\n\nQUESTION: ${englishQuery}\n\nANSWER in ${detectedLanguage}:`
+      : `Answer the following question concisely and accurately:\n\nQUESTION: ${englishQuery}\n\nANSWER:`;
     answer = await generateAnswer(fallbackPrompt);
-    
-    // Translate answer back if needed
-    if (detectedLanguage !== 'en') {
-      console.log('🔄 Translating answer back to original language...');
-      answer = await translateFromEnglish(answer, detectedLanguage);
-    }
     
     return {
       answer,
@@ -126,12 +132,6 @@ async function simulateChatRequest(query: string): Promise<ChatResponse> {
       detectedLanguage: detectedLanguage,
       translatedQuery: translatedQuery,
     };
-  }
-
-  // Step 4: Translate answer back to original language if needed
-  if (detectedLanguage !== 'en') {
-    console.log('🔄 Translating answer back to original language...');
-    answer = await translateFromEnglish(answer, detectedLanguage);
   }
 
   const sources = matches.map((match) => ({
@@ -158,7 +158,7 @@ async function testChat() {
     const queries = [
       // English
       // Bengali
-      'Animal Movie Director',
+      'chawal se kya kya banta hai',
       // Spanish
     ];
 

@@ -1,21 +1,28 @@
-export function buildRAGPrompt(query: string, context: string, targetLanguage: string = 'en', languageCode: string = 'en'): string {
-  const languageInstruction = languageCode !== 'en' 
-    ? ` Respond in ${targetLanguage}.`
-    : '';
+export function buildRAGPrompt(
+  query: string,
+  context: string,
+  targetLanguage: string = 'English',
+  languageCode: string = 'en'
+): string {
 
-  return `You are a farming advisor. Answer the question using only the information provided below.
+  const languageInstruction =
+    languageCode !== 'en' ? `Respond in ${targetLanguage}.` : 'Respond in English.';
 
-CONTEXT:
+  return `
+You are a farming advisor.
+
+Use the context ONLY if it clearly answers the question.
+If the context is insufficient or unclear, ignore it and answer normally using your own knowledge.
+Never say you don't know or that information is missing.
+Be practical and concise (70–90 words).
+${languageInstruction}
+
+Context:
 ${context}
 
-RULES:
-- Answer only using the context above
-- If the context doesn't contain the answer, say "I don't have specific information about that at the moment."
-- Keep answers concise (around 70-90 words)
-- Be practical and direct
-- Do not mention sources${languageInstruction}
+Question:
+${query}
 
-QUESTION: ${query}
-
-ANSWER:`;
+Answer:
+`;
 }

@@ -3,7 +3,7 @@ import { embedText, generateAnswer } from '../src/lib/gemini';
 import { queryVectors } from '../src/lib/pinecone';
 import { buildRAGPrompt } from '../src/lib/ragPrompt';
 import { logger } from '../src/utils/logger';
-import { detectLanguage, translateToEnglish, getLanguageName } from '../src/lib/translator';
+import { detectLanguage, translateToEnglish } from '../src/lib/translator';
 
 interface VercelRequest {
   method: string;
@@ -54,13 +54,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (matches.length === 0) {
       console.log('⚠ No relevant chunks found - using Gemini LLM fallback');
 
-      const languageName = getLanguageName(detectedLanguage);
-      const languageInstruction = detectedLanguage !== 'en' 
-        ? `\n\nIMPORTANT: Respond in ${languageName} (language code: ${detectedLanguage}), not English.`
-        : '';
-      const fallbackPrompt = `Answer the following question concisely and accurately:${languageInstruction}\n\nQUESTION: ${englishQuery}\n\nANSWER:`;
-      console.log(`🤖 Gemini will respond directly in: ${languageName} (${detectedLanguage})`);
-      let answer = await generateAnswer(fallbackPrompt);
+      // Generate answer directly in target language
+      const fallbackPrompt = detectedLanguage !== 'en'
+        ? `Answer the following question concisely and accurately in ${detectedLanguage} language (the same language as the original question "${query}"):\n\nQUESTION: ${englishQuery}\n\nANSWER in ${detectedLanguage}:`
+        : `Answer the following question concisely and accurately:\n\nQUESTION: ${englishQuery}\n\nANSWER:`;
+      const answer = await generateAnswer(fallbackPrompt);
 
       return res.status(200).json({
         answer,
@@ -86,12 +84,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (topScore < 0.6) {
       console.log(`⚠ Top score too low (${topScore.toFixed(4)} < 0.6) - using Gemini LLM fallback`);
 
-      const languageName = getLanguageName(detectedLanguage);
-      const languageInstruction = detectedLanguage !== 'en' 
-        ? `\n\nIMPORTANT: Respond in ${languageName} (language code: ${detectedLanguage}), not English.`
-        : '';
-      const fallbackPrompt = `Answer the following question concisely and accurately:${languageInstruction}\n\nQUESTION: ${englishQuery}\n\nANSWER:`;
-      let answer = await generateAnswer(fallbackPrompt);
+      // Generate answer directly in target language
+      const fallbackPrompt = detectedLanguage !== 'en'
+        ? `Answer the following question concisely and accurately in ${detectedLanguage} language (the same language as the original question "${query}"):\n\nQUESTION: ${englishQuery}\n\nANSWER in ${detectedLanguage}:`
+        : `Answer the following question concisely and accurately:\n\nQUESTION: ${englishQuery}\n\nANSWER:`;
+      const answer = await generateAnswer(fallbackPrompt);
 
       return res.status(200).json({
         answer,
@@ -109,19 +106,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .map((match) => match.metadata.text)
       .join('\n\n');
 
-    // Get language name for Gemini instruction
-    const languageName = getLanguageName(detectedLanguage);
-    const prompt = buildRAGPrompt(englishQuery, context, languageName, detectedLanguage);
-    console.log(`🤖 Gemini will respond directly in: ${languageName} (${detectedLanguage})`);
+    // Generate answer directly in target language using buildRAGPrompt with language parameters
+    const languageNames: Record<string, string> = {
+      'en': 'English',
+      'hi': 'Hindi',
+      'bn': 'Bengali',
+      'es': 'Spanish',
+      'fr': 'French',
+      'de': 'German',
+      'zh': 'Chinese',
+      'ar': 'Arabic',
+      'pt': 'Portuguese',
+      'ru': 'Russian',
+    };
+    
+    const targetLanguageName = languageNames[detectedLanguage] || detectedLanguage;
+    const prompt = buildRAGPrompt(englishQuery, context, targetLanguageName, detectedLanguage);
     let answer = await generateAnswer(prompt);
 
     if (answer.includes("I don't have specific information about that")) {
       console.log('⚠ RAG returned "not found" - using Gemini LLM fallback');
 
-      const languageInstruction = detectedLanguage !== 'en' 
-        ? `\n\nIMPORTANT: Respond in ${languageName} (language code: ${detectedLanguage}), not English.`
-        : '';
-      const fallbackPrompt = `Answer the following question concisely and accurately:${languageInstruction}\n\nQUESTION: ${englishQuery}\n\nANSWER:`;
+      // Generate answer directly in target language
+      const fallbackPrompt = detectedLanguage !== 'en'
+        ? `Answer the following question concisely and accurately in ${detectedLanguage} language (the same language as the original question "${query}"):\n\nQUESTION: ${englishQuery}\n\nANSWER in ${detectedLanguage}:`
+        : `Answer the following question concisely and accurately:\n\nQUESTION: ${englishQuery}\n\nANSWER:`;
       answer = await generateAnswer(fallbackPrompt);
 
       return res.status(200).json({
