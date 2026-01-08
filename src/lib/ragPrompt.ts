@@ -1,4 +1,8 @@
-export function buildRAGPrompt(query: string, context: string): string {
+export function buildRAGPrompt(query: string, context: string, targetLanguage: string = 'en', languageCode: string = 'en'): string {
+  const languageInstruction = languageCode !== 'en' 
+    ? `\n\nIMPORTANT: You MUST respond in ${targetLanguage} (language code: ${languageCode}). The user asked in ${targetLanguage}, so your entire answer must be in ${targetLanguage}, not English.`
+    : '';
+
   return `You are an experienced farming advisor helping farmers with their questions.
 
 KNOWLEDGE BASE:
@@ -25,11 +29,11 @@ STRICT RULES:
 - DO NOT use headings like "Overview", "Key benefits", or "Conclusion"
 - DO NOT use emojis or markdown tables
 - Present information as your own knowledge
-- Use simple language that farmers can easily understand
+- Use simple language that farmers can easily understand${languageInstruction}
 
 ERROR HANDLING:
 If the knowledge base does not clearly answer the question, respond exactly with:
-"I don't have specific information about that at the moment."
+"I don't have specific information about that at the moment."${languageCode !== 'en' ? ` (in ${targetLanguage})` : ''}
 
 QUESTION: ${query}
 

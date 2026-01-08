@@ -55,6 +55,21 @@ const languageMap: { [key: string]: string } = {
 // List of supported language codes
 const supportedLanguages = Object.values(languageMap);
 
+// Reverse mapping: code to name
+const codeToLanguageMap: { [key: string]: string } = {};
+Object.entries(languageMap).forEach(([name, code]) => {
+  codeToLanguageMap[code] = name.charAt(0).toUpperCase() + name.slice(1);
+});
+
+/**
+ * Get language name from language code
+ * @param code - Language code (e.g., 'es', 'hi', 'bn')
+ * @returns Language name (e.g., 'Spanish', 'Hindi', 'Bengali')
+ */
+export function getLanguageName(code: string): string {
+  return codeToLanguageMap[code] || 'English';
+}
+
 /**
  * Detect the language of a given text
  * @param text - The text to detect language for
