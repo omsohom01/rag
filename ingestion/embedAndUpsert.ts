@@ -12,7 +12,7 @@ function generateChunkId(source: string, index: number): string {
 export async function embedAndUpsertChunks(chunks: TextChunk[]): Promise<void> {
   logger.info(`Starting embedding and upserting ${chunks.length} chunks`);
 
-  const BATCH_SIZE = 50;
+  const BATCH_SIZE = 10;
   const vectors: { id: string; values: number[]; metadata: VectorMetadata }[] = [];
 
   // Process chunks in parallel batches

@@ -43,7 +43,7 @@ export async function embedBatch(texts: string[]): Promise<number[][]> {
 export async function generateAnswer(prompt: string): Promise<string> {
   try {
     const client = getClient();
-    const model = client.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+    const model = client.getGenerativeModel({ model: 'gemini-3-flash-preview' });
     const result = await model.generateContent(prompt);
     const response = result.response;
     return response.text();

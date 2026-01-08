@@ -7,8 +7,8 @@ export interface TextChunk {
   metadata?: Record<string, any>;
 }
 
-const CHUNK_SIZE = 800;
-const CHUNK_OVERLAP = 100;
+const CHUNK_SIZE = 400;
+const CHUNK_OVERLAP = 50;
 
 function estimateTokenCount(text: string): number {
   return Math.ceil(text.split(/\s+/).length);

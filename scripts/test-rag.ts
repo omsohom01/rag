@@ -11,6 +11,8 @@ async function testRAG() {
     console.log('');
 
     const testQueries = [
+      'how to farm rice',
+      'How does irrigation affect crop yield?',
       'What is crop rotation?',
       'Why is crop rotation important in farming?',
       'What are the different methods of irrigation?',
