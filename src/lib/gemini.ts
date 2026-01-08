@@ -67,6 +67,27 @@ function isQuotaError(error: any): boolean {
   );
 }
 
+function isRetryableError(error: any): boolean {
+  const errorMessage = error?.message || error?.toString() || '';
+  const errorStatus = error?.status || error?.statusCode || 0;
+  
+  return (
+    isQuotaError(error) ||
+    errorMessage.includes('503') ||
+    errorMessage.includes('Service Unavailable') ||
+    errorMessage.includes('MODEL_OVERLOADED') ||
+    errorMessage.includes('overloaded') ||
+    errorMessage.includes('500') ||
+    errorMessage.includes('Internal Server Error') ||
+    errorMessage.includes('temporarily unavailable') ||
+    errorMessage.includes('timeout') ||
+    errorStatus === 503 ||
+    errorStatus === 500 ||
+    errorStatus === 502 ||
+    errorStatus === 504
+  );
+}
+
 async function executeWithRotation<T>(
   operation: (client: GoogleGenerativeAI, model: string) => Promise<T>,
   maxRetries: number = API_KEYS.length * MODELS.length
@@ -83,18 +104,23 @@ async function executeWithRotation<T>(
       logger.info(`🔹 Using API Key ${currentKeyIndex + 1}, Model: ${model}`);
       const result = await operation(client, model);
       return result;
-    } catch (error) {
+    } catch (error: any) {
       lastError = error;
       
-      if (isQuotaError(error)) {
-        logger.warn(`⚠️ Quota exceeded for API Key ${currentKeyIndex + 1}, Model: ${model}`);
+      if (isRetryableError(error)) {
+        const errorMsg = (error as any)?.message || (error as any)?.toString() || '';
+        if (isQuotaError(error)) {
+          logger.warn(`⚠️ Quota exceeded for API Key ${currentKeyIndex + 1}, Model: ${model}`);
+        } else {
+          logger.warn(`⚠️ Server error (503/500/overloaded) for API Key ${currentKeyIndex + 1}, Model: ${model} - ${errorMsg}`);
+        }
         rotateToNextModel();
         attempts++;
         
         // Small delay before retry
         await new Promise(resolve => setTimeout(resolve, 1000));
       } else {
-        // Non-quota error, throw immediately
+        // Non-retryable error, throw immediately
         throw error;
       }
     }
