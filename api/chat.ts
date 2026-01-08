@@ -4,6 +4,7 @@ import { queryVectors } from '../src/lib/pinecone';
 import { buildRAGPrompt } from '../src/lib/ragPrompt';
 import { logger } from '../src/utils/logger';
 import { withRetry } from '../src/utils/retry';
+import { detectLanguage, translateText, translateAnswer } from '../src/lib/translator';
 
 interface VercelRequest {
   method: string;
@@ -29,8 +30,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     logger.info('Processing query', { query });
 
+    // Detect the original language of the query
+    const originalLanguage = await withRetry(
+      () => detectLanguage(query),
+      { maxAttempts: 3, delayMs: 1000 }
+    );
+
+    logger.info('Detected language', { originalLanguage, query: query.substring(0, 50) });
+
+    // Translate query to English if it's not already in English
+    let englishQuery = query;
+    if (originalLanguage !== 'en') {
+      englishQuery = await withRetry(
+        () => translateText(query, 'en'),
+        { maxAttempts: 3, delayMs: 1000 }
+      );
+      logger.info('Translated query to English', { 
+        originalLanguage,
+        englishQuery: englishQuery.substring(0, 50)
+      });
+    }
+
+    // Use English query for embedding and RAG
     const queryEmbedding = await withRetry(
-      () => embedText(query),
+      () => embedText(englishQuery),
       { maxAttempts: 3, delayMs: 1000 }
     );
 
@@ -50,11 +73,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (matches.length === 0) {
       logger.info('No relevant chunks found - using Gemini LLM fallback');
       
-      const fallbackPrompt = `Answer the following question concisely and accurately:\n\nQUESTION: ${query}\n\nANSWER:`;
-      const answer = await withRetry(
+      const fallbackPrompt = `Answer the following question concisely and accurately:\n\nQUESTION: ${englishQuery}\n\nANSWER:`;
+      let answer = await withRetry(
         () => generateAnswer(fallbackPrompt),
         { maxAttempts: 3, delayMs: 1000 }
       );
+
+      // Translate answer back to original language if needed
+      if (originalLanguage !== 'en') {
+        answer = await withRetry(
+          () => translateAnswer(answer, originalLanguage),
+          { maxAttempts: 3, delayMs: 1000 }
+        );
+      }
 
       return res.status(200).json({
         answer,
@@ -68,7 +99,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .map((match: any, idx: number) => `[${idx + 1}] (Source: ${match.metadata.source})\n${match.metadata.text}`)
       .join('\n\n');
 
-    const prompt = buildRAGPrompt(query, context);
+    const prompt = buildRAGPrompt(englishQuery, context);
 
     let answer = await withRetry(
       () => generateAnswer(prompt),
@@ -96,11 +127,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (isUnhelpfulAnswer) {
       logger.info('RAG returned unhelpful answer - using Gemini LLM fallback');
       
-      const fallbackPrompt = `Answer the following question concisely and accurately in 60-100 words:\n\nQUESTION: ${query}\n\nANSWER:`;
+      const fallbackPrompt = `Answer the following question concisely and accurately in 60-100 words:\n\nQUESTION: ${englishQuery}\n\nANSWER:`;
       answer = await withRetry(
         () => generateAnswer(fallbackPrompt),
         { maxAttempts: 3, delayMs: 1000 }
       );
+
+      // Translate answer back to original language if needed
+      if (originalLanguage !== 'en') {
+        answer = await withRetry(
+          () => translateAnswer(answer, originalLanguage),
+          { maxAttempts: 3, delayMs: 1000 }
+        );
+      }
 
       return res.status(200).json({
         answer,
@@ -115,6 +154,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       score: match.score,
       chunkIndex: match.metadata.chunkIndex,
     }));
+
+    // Translate answer back to original language if needed
+    if (originalLanguage !== 'en') {
+      answer = await withRetry(
+        () => translateAnswer(answer, originalLanguage),
+        { maxAttempts: 3, delayMs: 1000 }
+      );
+    }
 
     logger.info('Query processed successfully with RAG');
 
