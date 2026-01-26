@@ -1,6 +1,29 @@
 import { generateAnswer } from './gemini';
 import { logger } from '../utils/logger';
 
+// Pre-translated rejection messages to avoid additional API calls
+const REJECTION_MESSAGES: Record<string, string> = {
+  'en': 'Sorry, I can only answer questions related to farming, agriculture, environment, weather, banking/loans, government schemes, or farming news.',
+  'hi': 'क्षमा करें, मैं केवल कृषि, पर्यावरण, मौसम, बैंकिंग/ऋण, सरकारी योजनाओं या कृषि समाचार से संबंधित प्रश्नों का उत्तर दे सकता हूं।',
+  'bn': 'দুঃখিত, আমি শুধুমাত্র কৃষি, পরিবেশ, আবহাওয়া, ব্যাংকিং/ঋণ, সরকারী স্কিম বা কৃষি সংবাদ সম্পর্কিত প্রশ্নের উত্তর দিতে পারি।',
+  'es': 'Lo siento, solo puedo responder preguntas relacionadas con agricultura, medio ambiente, clima, banca/préstamos, programas gubernamentales o noticias agrícolas.',
+  'fr': 'Désolé, je ne peux répondre qu\'aux questions liées à l\'agriculture, l\'environnement, la météo, la banque/les prêts, les programmes gouvernementaux ou les actualités agricoles.',
+  'de': 'Entschuldigung, ich kann nur Fragen zu Landwirtschaft, Umwelt, Wetter, Banking/Darlehen, Regierungsprogrammen oder Agrarwissenschaften beantworten.',
+  'pt': 'Desculpe, posso responder apenas perguntas relacionadas a agricultura, meio ambiente, clima, bancos/empréstimos, programas governamentais ou notícias agrícolas.',
+  'zh': '抱歉，我只能回答与农业、环境、天气、银行/贷款、政府计划或农业新闻相关的问题。',
+  'ar': 'عذرًا، يمكنني الإجابة فقط على الأسئلة المتعلقة بالزراعة والبيئة والطقس والبنوك والقروض والمخططات الحكومية أو الأخبار الزراعية.',
+  'ru': 'Извините, я могу ответить только на вопросы, связанные с сельским хозяйством, окружающей средой, погодой, банками/кредитами, государственными программами или сельскохозяйственными новостями.',
+};
+
+/**
+ * Gets the rejection message in the specified language
+ * @param languageCode - Language code (e.g., 'en', 'hi', 'bn')
+ * @returns Rejection message in the specified language
+ */
+export function getRejectionMessage(languageCode: string = 'en'): string {
+  return REJECTION_MESSAGES[languageCode] || REJECTION_MESSAGES['en'];
+}
+
 /**
  * Validates if a query is related to allowed topics using AI analysis
  * Allowed topics: farming, agriculture, environment, weather, banking/loans, government schemes, farming news
@@ -44,7 +67,7 @@ Your response:`;
       logger.info('Topic validation: INVALID', { query });
       return {
         isValid: false,
-        message: 'Sorry, I can only answer questions related to farming, agriculture, environment, weather, banking/loans, government schemes, or farming news. Please ask a question related to these topics.',
+        message: getRejectionMessage('en'),
       };
     }
   } catch (error) {

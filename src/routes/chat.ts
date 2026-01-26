@@ -4,7 +4,7 @@ import { queryVectors } from '../lib/pinecone';
 import { buildRAGPrompt } from '../lib/ragPrompt';
 import { logger } from '../utils/logger';
 import { detectLanguage, translateToEnglish } from '../lib/translator';
-import { validateQueryTopic } from '../lib/topicValidator';
+import { validateQueryTopic, getRejectionMessage } from '../lib/topicValidator';
 
 interface VercelRequest {
   method: string;
@@ -54,15 +54,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!topicValidation.isValid) {
       console.log('❌ Query topic validation failed - not farming/agriculture related');
       
-      // Return rejection message in the original language
-      let rejectionMessage = topicValidation.message || 
-        'Sorry, I can only answer questions related to farming, agriculture, environment, weather, banking/loans, government schemes, or farming news.';
-      
-      // Translate rejection message if needed
-      if (detectedLanguage !== 'en') {
-        const translationPrompt = `Translate the following message to ${detectedLanguage} language:\n\n"${rejectionMessage}"\n\nTranslation:`;
-        rejectionMessage = await generateAnswer(translationPrompt);
-      }
+      // Get pre-translated rejection message - NO API CALL NEEDED
+      const rejectionMessage = getRejectionMessage(detectedLanguage);
       
       return res.status(200).json({
         answer: rejectionMessage,
