@@ -4,6 +4,7 @@ import { queryVectors } from '../lib/pinecone';
 import { buildRAGPrompt } from '../lib/ragPrompt';
 import { logger } from '../utils/logger';
 import { detectLanguage, translateToEnglish } from '../lib/translator';
+import { validateQueryTopic } from '../lib/topicValidator';
 
 interface VercelRequest {
   method: string;
@@ -46,6 +47,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log(`📖 English Query: "${englishQuery}"`);
     }
 
+    // Step 2.5: Validate if query is related to allowed topics
+    console.log('🔍 Validating query topic...');
+    const topicValidation = await validateQueryTopic(englishQuery);
+    
+    if (!topicValidation.isValid) {
+      console.log('❌ Query topic validation failed - not farming/agriculture related');
+      
+      // Return rejection message in the original language
+      let rejectionMessage = topicValidation.message || 
+        'Sorry, I can only answer questions related to farming, agriculture, environment, weather, banking/loans, government schemes, or farming news.';
+      
+      // Translate rejection message if needed
+      if (detectedLanguage !== 'en') {
+        const translationPrompt = `Translate the following message to ${detectedLanguage} language:\n\n"${rejectionMessage}"\n\nTranslation:`;
+        rejectionMessage = await generateAnswer(translationPrompt);
+      }
+      
+      return res.status(200).json({
+        answer: rejectionMessage,
+        sources: [],
+        originalLanguage: detectedLanguage,
+        detectedLanguage: detectedLanguage,
+        translatedQuery: translatedQuery,
+        topicValidation: false,
+      });
+    }
+    
+    console.log('✓ Query topic validation passed');
+
     console.log('-'.repeat(60));
 
     // Step 3: Embed and query vectors using English text
@@ -57,8 +87,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Generate answer directly in target language
       const fallbackPrompt = detectedLanguage !== 'en'
-        ? `Answer the following question concisely and accurately in ${detectedLanguage} language (the same language as the original question "${query}"):\n\nQUESTION: ${englishQuery}\n\nANSWER in ${detectedLanguage}:`
-        : `Answer the following question concisely and accurately:\n\nQUESTION: ${englishQuery}\n\nANSWER:`;
+        ? `You are a farming and agricultural advisor. Answer the following question concisely and accurately in ${detectedLanguage} language (the same language as the original question "${query}"). Only answer if the question is related to farming, agriculture, environment, weather, banking/loans, government schemes, or farming news.\n\nQUESTION: ${englishQuery}\n\nANSWER in ${detectedLanguage}:`
+        : `You are a farming and agricultural advisor. Answer the following question concisely and accurately. Only answer if the question is related to farming, agriculture, environment, weather, banking/loans, government schemes, or farming news.\n\nQUESTION: ${englishQuery}\n\nANSWER:`;
       const answer = await generateAnswer(fallbackPrompt);
 
       return res.status(200).json({
@@ -87,8 +117,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Generate answer directly in target language
       const fallbackPrompt = detectedLanguage !== 'en'
-        ? `Answer the following question concisely and accurately in ${detectedLanguage} language (the same language as the original question "${query}"):\n\nQUESTION: ${englishQuery}\n\nANSWER in ${detectedLanguage}:`
-        : `Answer the following question concisely and accurately:\n\nQUESTION: ${englishQuery}\n\nANSWER:`;
+        ? `You are a farming and agricultural advisor. Answer the following question concisely and accurately in ${detectedLanguage} language (the same language as the original question "${query}"). Only answer if the question is related to farming, agriculture, environment, weather, banking/loans, government schemes, or farming news.\n\nQUESTION: ${englishQuery}\n\nANSWER in ${detectedLanguage}:`
+        : `You are a farming and agricultural advisor. Answer the following question concisely and accurately. Only answer if the question is related to farming, agriculture, environment, weather, banking/loans, government schemes, or farming news.\n\nQUESTION: ${englishQuery}\n\nANSWER:`;
       const answer = await generateAnswer(fallbackPrompt);
 
       return res.status(200).json({
@@ -130,8 +160,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Generate answer directly in target language
       const fallbackPrompt = detectedLanguage !== 'en'
-        ? `Answer the following question concisely and accurately in ${detectedLanguage} language (the same language as the original question "${query}"):\n\nQUESTION: ${englishQuery}\n\nANSWER in ${detectedLanguage}:`
-        : `Answer the following question concisely and accurately:\n\nQUESTION: ${englishQuery}\n\nANSWER:`;
+        ? `You are a farming and agricultural advisor. Answer the following question concisely and accurately in ${detectedLanguage} language (the same language as the original question "${query}"). Only answer if the question is related to farming, agriculture, environment, weather, banking/loans, government schemes, or farming news.\n\nQUESTION: ${englishQuery}\n\nANSWER in ${detectedLanguage}:`
+        : `You are a farming and agricultural advisor. Answer the following question concisely and accurately. Only answer if the question is related to farming, agriculture, environment, weather, banking/loans, government schemes, or farming news.\n\nQUESTION: ${englishQuery}\n\nANSWER:`;
       answer = await generateAnswer(fallbackPrompt);
 
       return res.status(200).json({
