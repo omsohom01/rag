@@ -36,17 +36,30 @@ interface DealNotificationRequest {
 
 router.post('/whatsapp', async (req: Request, res: Response) => {
   const requestId = Date.now().toString(36);
+  console.log(`\n📲 ══════════════════════════════════════════`);
+  console.log(`📲 WHATSAPP NOTIFICATION - Request ID: ${requestId}`);
+  console.log(`📲 Time: ${new Date().toISOString()}`);
+  console.log(`📲 ══════════════════════════════════════════`);
+  console.log(`📲 Body: ${JSON.stringify(req.body, null, 2)}`);
+  process.stdout.write(`\n[NOTIFY] ══════ NEW REQUEST ${requestId} ══════\n`);
   logger.info(`[${requestId}] WhatsApp notification request`);
 
   try {
     const payload = req.body as DealNotificationRequest;
 
     if (!payload.farmerPhone) {
+      console.log(`[${requestId}] ❌ Missing farmerPhone`);
       return res.status(400).json({ success: false, message: 'farmerPhone is required' });
     }
     if (!payload.type) {
+      console.log(`[${requestId}] ❌ Missing type`);
       return res.status(400).json({ success: false, message: 'type is required' });
     }
+
+    console.log(`[${requestId}] Type: ${payload.type}`);
+    console.log(`[${requestId}] To: ${payload.farmerPhone}`);
+    console.log(`[${requestId}] Product: ${payload.productName}`);
+    process.stdout.write(`[NOTIFY] Sending ${payload.type} to ${payload.farmerPhone}...\n`);
 
     // Build the notification message based on type
     let message = '';
@@ -132,9 +145,12 @@ router.post('/whatsapp', async (req: Request, res: Response) => {
         }
       );
 
+      console.log(`[${requestId}] ✅ WhatsApp message sent directly to ${payload.farmerPhone}`);
+      process.stdout.write(`[NOTIFY] ✅ Sent directly to ${payload.farmerPhone}\n`);
       logger.info(`[${requestId}] WhatsApp notification sent directly to ${payload.farmerPhone}`);
     } else {
       // Forward to WhatsApp service
+      console.log(`[${requestId}] Forwarding to WhatsApp service: ${WHATSAPP_SERVICE_URL}/send-message`);
       await axios.post(
         `${WHATSAPP_SERVICE_URL}/send-message`,
         {
@@ -147,14 +163,21 @@ router.post('/whatsapp', async (req: Request, res: Response) => {
         }
       );
 
+      console.log(`[${requestId}] ✅ Notification forwarded to WhatsApp service`);
+      process.stdout.write(`[NOTIFY] ✅ Forwarded to WhatsApp service\n`);
       logger.info(`[${requestId}] WhatsApp notification forwarded to WhatsApp service for ${payload.farmerPhone}`);
     }
 
+    console.log(`[${requestId}] ✅ NOTIFICATION COMPLETE`);
+    console.log(`📲 ══════════════════════════════════════════\n`);
     return res.status(200).json({
       success: true,
       message: 'WhatsApp notification sent successfully',
     });
   } catch (error: any) {
+    console.error(`[${requestId}] ❌ NOTIFICATION FAILED: ${error.message}`);
+    console.error(`[${requestId}] Stack: ${error.stack}`);
+    process.stdout.write(`[NOTIFY] ❌ FAILED: ${error.message}\n`);
     logger.error(`[${requestId}] Failed to send WhatsApp notification`, error);
     return res.status(500).json({
       success: false,

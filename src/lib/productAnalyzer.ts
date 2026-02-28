@@ -44,29 +44,51 @@ async function callGeminiVision(
   prompt: string,
   maxRetries = API_KEYS.length * MODELS.length
 ): Promise<string> {
+  console.log(`\n🤖 ── GEMINI VISION CALL ──────────────────`);
+  console.log(`🤖 Image size: ${imageBase64.length} base64 chars`);
+  console.log(`🤖 MIME type: ${mimeType}`);
+  console.log(`🤖 Available API keys: ${API_KEYS.length}`);
+  console.log(`🤖 Available models: ${MODELS.join(', ')}`);
+  console.log(`🤖 Max retries: ${maxRetries}`);
+  process.stdout.write(`[GEMINI-VISION] Starting image analysis...\n`);
+
   let lastErr: any;
   for (let i = 0; i < maxRetries; i++) {
     const apiKey = API_KEYS[keyIdx];
     const model = MODELS[modelIdx];
+    console.log(`🤖 Attempt ${i + 1}/${maxRetries}: key=${keyIdx + 1}, model=${model}`);
+    process.stdout.write(`[GEMINI-VISION] Attempt ${i + 1} with ${model}...\n`);
     try {
       const client = new GoogleGenerativeAI(apiKey);
       const genModel = client.getGenerativeModel({ model });
+      console.log(`🤖 Sending image to Gemini ${model}...`);
+      const startTime = Date.now();
       const result = await genModel.generateContent([
         { inlineData: { mimeType, data: imageBase64 } },
         { text: prompt },
       ]);
-      return result.response.text();
+      const elapsed = Date.now() - startTime;
+      const responseText = result.response.text();
+      console.log(`✅ Gemini responded in ${elapsed}ms (${responseText.length} chars)`);
+      console.log(`🤖 Raw response: ${responseText.substring(0, 500)}`);
+      process.stdout.write(`[GEMINI-VISION] ✅ Success in ${elapsed}ms\n`);
+      return responseText;
     } catch (err: any) {
       lastErr = err;
+      console.error(`❌ Gemini attempt ${i + 1} FAILED: ${err.message}`);
+      process.stdout.write(`[GEMINI-VISION] ❌ Failed: ${err.message}\n`);
       if (isRetryable(err)) {
+        console.log(`🔄 Retryable error, rotating to next model...`);
         logger.warn(`Gemini vision retry (key=${keyIdx + 1}, model=${model}): ${err.message}`);
         rotate();
         await new Promise((r) => setTimeout(r, 1000));
       } else {
+        console.error(`💀 Non-retryable error, throwing immediately`);
         throw err;
       }
     }
   }
+  console.error(`💀 All ${maxRetries} attempts exhausted`);
   throw lastErr;
 }
 
@@ -98,7 +120,17 @@ export async function analyzeWhatsAppProduct(
   mimeType: string,
   captionText: string
 ): Promise<ProductAnalysis> {
+  console.log(`\n📦 ══════════════════════════════════════════`);
+  console.log(`📦 PRODUCT ANALYSIS STARTED`);
+  console.log(`📦 ══════════════════════════════════════════`);
+  console.log(`📦 Caption text: "${captionText}"`);
+  console.log(`📦 Image size: ${imageBase64.length} base64 chars`);
+  console.log(`📦 MIME type: ${mimeType}`);
+  console.log(`📦 API keys available: ${API_KEYS.length}`);
+  process.stdout.write(`[PRODUCT-ANALYZER] Starting analysis for: "${captionText}"\n`);
+
   if (API_KEYS.length === 0) {
+    console.error('❌ No Gemini API keys configured!');
     throw new Error('No Gemini API keys configured');
   }
 
@@ -155,14 +187,19 @@ If the image is NOT a food product OR the text doesn't contain quantity/price in
 
 Return ONLY the JSON object, nothing else.`;
 
+  console.log(`📦 Calling Gemini Vision for product analysis...`);
+  process.stdout.write(`[PRODUCT-ANALYZER] Calling Gemini Vision...\n`);
   const rawText = await callGeminiVision(imageBase64, mimeType, prompt);
+  console.log(`📦 Gemini raw response received (${rawText.length} chars)`);
+  process.stdout.write(`[PRODUCT-ANALYZER] Got Gemini response, parsing JSON...\n`);
 
   try {
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
     const raw = jsonMatch ? jsonMatch[0] : rawText;
+    console.log(`📦 Extracted JSON: ${raw.substring(0, 300)}`);
     const parsed = JSON.parse(raw);
 
-    return {
+    const result = {
       isProduct: parsed.isProduct === true,
       productName: String(parsed.productName || '').trim(),
       category: String(parsed.category || '').trim(),
@@ -172,7 +209,23 @@ Return ONLY the JSON object, nothing else.`;
       perUnitPrice: Number(parsed.perUnitPrice) || 0,
       reason: String(parsed.reason || '').trim(),
     };
+
+    console.log(`📦 ── ANALYSIS RESULT ──`);
+    console.log(`📦 Is Product: ${result.isProduct}`);
+    console.log(`📦 Product Name: ${result.productName}`);
+    console.log(`📦 Category: ${result.category}`);
+    console.log(`📦 Quantity: ${result.quantity} ${result.unit}`);
+    console.log(`📦 Total Price: ₹${result.totalPrice}`);
+    console.log(`📦 Per Unit Price: ₹${result.perUnitPrice}/${result.unit}`);
+    console.log(`📦 Reason: ${result.reason}`);
+    console.log(`📦 ══════════════════════════════════════════\n`);
+    process.stdout.write(`[PRODUCT-ANALYZER] ✅ Result: ${result.productName} (${result.category}) - ${result.quantity}${result.unit} @ ₹${result.perUnitPrice}\n`);
+
+    return result;
   } catch (parseError) {
+    console.error(`❌ Failed to parse Gemini response as JSON!`);
+    console.error(`❌ Raw text: ${rawText}`);
+    process.stdout.write(`[PRODUCT-ANALYZER] ❌ JSON parse failed\n`);
     logger.error('Failed to parse Gemini product analysis response', { rawText, parseError });
     return {
       isProduct: false,
