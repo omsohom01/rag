@@ -9,7 +9,10 @@
     "start": "node dist/server.js",
     "ingest": "tsx ingestion/ingest.ts",
     "type-check": "tsc --noEmit",
-    "test:translation": "tsx scripts/test-translation.ts"
+    "test:translation": "tsx scripts/test-translation.ts",
+    "test:image": "tsx scripts/test-image.ts",
+    "test:image:quick": "tsx scripts/test-image-quick.ts",
+    "test:render": "tsx scripts/test-render-endpoint.ts"
   },
   "keywords": [
     "rag",
