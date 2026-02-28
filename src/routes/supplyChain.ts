@@ -130,57 +130,55 @@ router.post('/product', async (req: Request, res: Response) => {
 
     try {
       // Search users collection for this phone number
-      console.log(`[${requestId}]   Querying 'users' collection for phone: ${farmerPhone}`);
-      const usersSnap = await db
-        .collection('users')
-        .where('phone', '==', farmerPhone)
-        .limit(1)
-        .get();
+      // The app stores phone as 'phoneNumber' and 'mobileNumber' fields (not 'phone')
+      // Phone format in Firestore: "+919836444455" (E.164)
+      // Phone from WhatsApp: "919836444455" (no +)
+      const normalizedPhone = farmerPhone.startsWith('+')
+        ? farmerPhone
+        : farmerPhone.startsWith('91')
+          ? `+${farmerPhone}`
+          : `+91${farmerPhone}`;
+      const rawPhone = farmerPhone;
 
-      console.log(`[${requestId}]   Query result: ${usersSnap.size} docs found`);
+      console.log(`[${requestId}]   Querying 'users' collection for phone: ${rawPhone} / ${normalizedPhone}`);
 
-      if (!usersSnap.empty) {
-        const userDoc = usersSnap.docs[0];
-        farmerId = userDoc.id;
-        const userData = userDoc.data();
-        resolvedFarmerName = userData.displayName || userData.name || resolvedFarmerName;
-        farmerLocation = userData.location || userData.address || '';
-        console.log(`[${requestId}]   ✅ Found farmer: ID=${farmerId}, Name=${resolvedFarmerName}, Location=${farmerLocation}`);
-        process.stdout.write(`[SUPPLY-CHAIN] ✅ Found farmer in DB: ${resolvedFarmerName}\n`);
-        logger.info(`[${requestId}] Found farmer in DB: ${farmerId} (${resolvedFarmerName})`);
-      } else {
-        // Try with normalized phone (add +91 if not present)
-        const normalizedPhone = farmerPhone.startsWith('+')
-          ? farmerPhone
-          : farmerPhone.startsWith('91')
-            ? `+${farmerPhone}`
-            : `+91${farmerPhone}`;
+      // Try multiple phone field names and formats
+      const phoneFields = ['phoneNumber', 'mobileNumber', 'phone'];
+      const phoneValues = [...new Set([normalizedPhone, rawPhone])]; // deduplicate
 
-        console.log(`[${requestId}]   Not found. Trying normalized phone: ${normalizedPhone}`);
-        const normalizedSnap = await db
-          .collection('users')
-          .where('phone', '==', normalizedPhone)
-          .limit(1)
-          .get();
+      let found = false;
 
-        console.log(`[${requestId}]   Normalized query result: ${normalizedSnap.size} docs found`);
+      for (const field of phoneFields) {
+        if (found) break;
+        for (const phoneVal of phoneValues) {
+          if (found) break;
+          console.log(`[${requestId}]   Trying: ${field} == "${phoneVal}"`);
+          const snap = await db
+            .collection('users')
+            .where(field, '==', phoneVal)
+            .limit(1)
+            .get();
 
-        if (!normalizedSnap.empty) {
-          const userDoc = normalizedSnap.docs[0];
-          farmerId = userDoc.id;
-          const userData = userDoc.data();
-          resolvedFarmerName = userData.displayName || userData.name || resolvedFarmerName;
-          farmerLocation = userData.location || userData.address || '';
-          console.log(`[${requestId}]   ✅ Found farmer (normalized): ID=${farmerId}, Name=${resolvedFarmerName}`);
-          process.stdout.write(`[SUPPLY-CHAIN] ✅ Found farmer (normalized): ${resolvedFarmerName}\n`);
-          logger.info(`[${requestId}] Found farmer with normalized phone: ${farmerId}`);
-        } else {
-          // Create a reference ID from the phone number
-          farmerId = `whatsapp_${farmerPhone.replace(/\D/g, '')}`;
-          console.log(`[${requestId}]   ⚠️ Farmer not found in DB. Generated ID: ${farmerId}`);
-          process.stdout.write(`[SUPPLY-CHAIN] ⚠️ Farmer not in DB, using ID: ${farmerId}\n`);
-          logger.info(`[${requestId}] Farmer not found in DB, using generated ID: ${farmerId}`);
+          if (!snap.empty) {
+            const userDoc = snap.docs[0];
+            farmerId = userDoc.id;
+            const userData = userDoc.data();
+            resolvedFarmerName = userData.displayName || userData.name || resolvedFarmerName;
+            farmerLocation = userData.location || userData.address || userData.farmerLocation || '';
+            console.log(`[${requestId}]   ✅ Found farmer via ${field}="${phoneVal}": ID=${farmerId}, Name=${resolvedFarmerName}`);
+            process.stdout.write(`[SUPPLY-CHAIN] ✅ Found farmer in DB: ${resolvedFarmerName} (${farmerId})\n`);
+            logger.info(`[${requestId}] Found farmer in DB: ${farmerId} (${resolvedFarmerName})`);
+            found = true;
+          }
         }
+      }
+
+      if (!found) {
+        // Create a reference ID from the phone number
+        farmerId = `whatsapp_${farmerPhone.replace(/\D/g, '')}`;
+        console.log(`[${requestId}]   ⚠️ Farmer not found in DB with any phone field. Generated ID: ${farmerId}`);
+        process.stdout.write(`[SUPPLY-CHAIN] ⚠️ Farmer not in DB, using ID: ${farmerId}\n`);
+        logger.info(`[${requestId}] Farmer not found in DB, using generated ID: ${farmerId}`);
       }
     } catch (lookupErr: any) {
       console.error(`[${requestId}]   ❌ Farmer lookup FAILED: ${lookupErr.message}`);
