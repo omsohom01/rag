@@ -132,9 +132,9 @@ async function executeWithRotation<T>(
 
 export async function embedText(text: string): Promise<number[]> {
   try {
-    // Embedding always uses text-embedding-004 model (not affected by rotation)
+    // Embedding uses gemini-embedding-001 model (not affected by rotation)
     return await executeWithRotation(async (client, _model) => {
-      const embeddingModel = client.getGenerativeModel({ model: 'text-embedding-004' });
+      const embeddingModel = client.getGenerativeModel({ model: 'gemini-embedding-001' });
       const result = await embeddingModel.embedContent(text);
       return result.embedding.values;
     });
@@ -147,7 +147,7 @@ export async function embedText(text: string): Promise<number[]> {
 export async function embedBatch(texts: string[]): Promise<number[][]> {
   try {
     return await executeWithRotation(async (client, _model) => {
-      const embeddingModel = client.getGenerativeModel({ model: 'text-embedding-004' });
+      const embeddingModel = client.getGenerativeModel({ model: 'gemini-embedding-001' });
       const results = await Promise.all(
         texts.map((text) => embeddingModel.embedContent(text))
       );
