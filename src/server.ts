@@ -3,6 +3,7 @@ import cors from 'cors';
 import { config } from 'dotenv';
 import { logger } from './utils/logger';
 import chatRouter from './routes/chat';
+import imageRouter from './routes/image';
 
 config();
 
@@ -21,6 +22,7 @@ app.use((req, res, next) => {
 
 // Routes
 app.use('/chat', chatRouter);
+app.use('/image', imageRouter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
