@@ -132,10 +132,13 @@ async function executeWithRotation<T>(
 
 export async function embedText(text: string): Promise<number[]> {
   try {
-    // Embedding uses text-embedding-005 model (768 dims, matching Pinecone index)
+    // gemini-embedding-001 with outputDimensionality=768 to match Pinecone index
     return await executeWithRotation(async (client, _model) => {
-      const embeddingModel = client.getGenerativeModel({ model: 'text-embedding-005' });
-      const result = await embeddingModel.embedContent(text);
+      const embeddingModel = client.getGenerativeModel({ model: 'gemini-embedding-001' });
+      const result = await embeddingModel.embedContent({
+        content: { role: 'user', parts: [{ text }] },
+        outputDimensionality: 768,
+      } as any);
       return result.embedding.values;
     });
   } catch (error) {
@@ -147,9 +150,12 @@ export async function embedText(text: string): Promise<number[]> {
 export async function embedBatch(texts: string[]): Promise<number[][]> {
   try {
     return await executeWithRotation(async (client, _model) => {
-      const embeddingModel = client.getGenerativeModel({ model: 'text-embedding-005' });
+      const embeddingModel = client.getGenerativeModel({ model: 'gemini-embedding-001' });
       const results = await Promise.all(
-        texts.map((text) => embeddingModel.embedContent(text))
+        texts.map((text) => embeddingModel.embedContent({
+          content: { role: 'user', parts: [{ text }] },
+          outputDimensionality: 768,
+        } as any))
       );
       return results.map((result) => result.embedding.values);
     });
